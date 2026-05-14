@@ -6,7 +6,7 @@ from rdkit.Chem import Draw
 import base64
 from io import BytesIO
 
-from logic import is_chromophore, predict, RANGES
+from logic import is_chromophore, predict, RANGES, FEATURE_LABELS
 
 # Importamos tu lógica (puedes copiar las funciones aquí o importarlas si están en otro archivo)
 # Por brevedad, asumo que las funciones: is_chromophore, extract_features, score_feature y predict 
@@ -80,24 +80,41 @@ with tab2:
             res_dict = {"SMILES": s, "Estado_Cromoforo": reason}
             
             if scores:
-                # Añadir los scores de cada tela al diccionario
                 res_dict.update(scores)
-                # Determinar mejor categoría
                 best_fabric = max(scores, key=scores.get)
                 res_dict["Mejor Opción"] = f"{best_fabric} ({scores[best_fabric]}%)"
             else:
-                for fab in RANGES.keys(): res_dict[fab] = 0
+                for fab in RANGES.keys(): 
+                   res_dict[fab] = np.nan 
                 res_dict["Mejor Opción"] = "N/A"
             
             results.append(res_dict)
         
         df_results = pd.DataFrame(results)
-        st.dataframe(df_results.style.highlight_max(axis=1, subset=list(RANGES.keys()), color='#90ee90'))
+        st.dataframe(df_results.style.highlight_max(axis=1, subset=list(RANGES.keys()), color="#00c700c5"))
         
         # Opción de descarga
         csv = df_results.to_csv(index=False).encode('utf-8')
         st.download_button("Descargar Reporte CSV", csv, "resultados_biopigmentos.csv", "text/csv")
 
 # Sección de referencia de rangos
-with st.expander("Ver Criterios de Selección (Rangos Químicos)"):
-    st.json(RANGES)
+# Sección de referencia de rangos (Criterios de Selección)
+with st.expander("📊 Ver Criterios de Selección (Rangos Químicos)"):
+    # Reestructuramos el diccionario RANGES para que sea legible en una tabla
+    table_data = []
+    for fabric, criteria in RANGES.items():
+        row = {"Tipo de Tela": fabric}
+        for feature, (lo, hi) in criteria.items():
+            row[FEATURE_LABELS[feature]] = f"{lo} - {hi}"
+        table_data.append(row)
+    
+    df_criteria = pd.DataFrame(table_data)
+    
+    # Mostramos la tabla ocupando todo el ancho
+    st.table(df_criteria.set_index("Tipo de Tela"))
+    
+    st.info("""
+    **Nota sobre el Scoring:** 
+    Los valores dentro del rango otorgan 100 puntos. Si el valor cae fuera, 
+    el puntaje decae exponencialmente según la distancia al límite.
+    """)
